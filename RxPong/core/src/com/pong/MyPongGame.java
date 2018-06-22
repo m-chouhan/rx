@@ -19,8 +19,11 @@ public class MyPongGame extends ApplicationAdapter {
     SpriteBatch batch;
     Integer score = 0;
     OrthographicCamera camera;
+    private OrthographicCamera myWorldcamera;
 
     private int SCREEN_WIDTH, SCREEN_HEIGHT;
+    private int WORLD_WIDTH = 10, WORLD_HEIGHT = 10;
+    private Observable<InputObservable.InputEvent> inputStream;
 
     @Override
     public void create() {
@@ -28,17 +31,34 @@ public class MyPongGame extends ApplicationAdapter {
         font.setColor(Color.BLUE);
         font.getData().setScale(5);
         batch = new SpriteBatch();
-        camera = Utility.setupCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-        SCREEN_WIDTH = Gdx.graphics.getHeight();
-        SCREEN_HEIGHT = Gdx.graphics.getWidth();
 
+        float w = Gdx.graphics.getWidth();
+        float h = Gdx.graphics.getHeight();
+        myWorldcamera = Utility.setupCamera(WORLD_WIDTH, WORLD_HEIGHT * (h / w));
+
+        camera = Utility.setupCamera(w, h);
+        SCREEN_WIDTH = (int) h;
+        SCREEN_HEIGHT = (int) w;
+
+        inputStream = InputObservable.create(camera);
+        inputStream
+                .filter(event -> event.type == InputObservable.EventType.DOWN)
+                .buffer(1000, TimeUnit.MILLISECONDS)
+                .doOnEach(item -> Gdx.app.log("Count", "" + item.getValue().size()))
+                .filter(items -> items.size() > 2)
+                .take(1)
+                .ignoreElements()
+                .subscribe(this::startGame);
+
+        //libgdx config changes
+        Gdx.graphics.setContinuousRendering(false);
+    }
+
+    public void startGame() {
         Observable
                 .interval(500, TimeUnit.MILLISECONDS)
                 .subscribe(count -> Gdx.graphics.requestRendering());
         Observable.interval(1, TimeUnit.SECONDS).subscribe((time) -> score++);
-
-        //libgdx config changes
-        Gdx.graphics.setContinuousRendering(false);
     }
 
     @Override
