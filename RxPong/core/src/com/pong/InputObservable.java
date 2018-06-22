@@ -89,7 +89,6 @@ public class InputObservable extends InputAdapter {
                     Vector3 vector3 = camera.unproject(new Vector3(inputEvent.x, inputEvent.y, 0));
                     inputEvent.x = vector3.x;
                     inputEvent.y = vector3.y;
-                    //Gdx.app.log("Transformed", inputEvent.toString());
                     return inputEvent;
                 })
                 .share();
