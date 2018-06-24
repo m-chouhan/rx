@@ -25,6 +25,9 @@ public class Box {
         bodyDef.type = bodyType;
         bodyDef.position.set(position);
         body = world.createBody(bodyDef);
+        body.setGravityScale(0);
+        body.setLinearDamping(10);
+        body.setAngularDamping(100);
         rectangle = new Rectangle(position.x, position.y, dimensions.x, dimensions.y);
         this.scaleFactor = scaleFactor;
         //Assign various physical properties to our body
@@ -32,9 +35,9 @@ public class Box {
         shape.setAsBox(dimensions.x / 2, dimensions.y / 2);
         FixtureDef fixtureDef = new FixtureDef();
         fixtureDef.shape = shape;
-        fixtureDef.density = 0.5f;
+        fixtureDef.density = 10f;
         fixtureDef.friction = 0.0f;
-        fixtureDef.restitution = 0.95f;
+        fixtureDef.restitution = 0f;
         body.createFixture(fixtureDef);
         shape.dispose();
     }
@@ -45,6 +48,10 @@ public class Box {
 
     Rectangle getBoundingBox() {
         return rectangle.setCenter(body.getPosition());
+    }
+
+    Body getBody() {
+        return body;
     }
 
     void setLinearVelocity(Vector2 velocity) {

@@ -9,14 +9,16 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.physics.box2d.joints.MouseJoint;
+import com.badlogic.gdx.physics.box2d.joints.MouseJointDef;
 
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
-import io.reactivex.Scheduler;
 
 public class MyPongGame extends ApplicationAdapter {
 
@@ -64,7 +66,7 @@ public class MyPongGame extends ApplicationAdapter {
         world = new World(new Vector2(0, -5f), false);
         ball = new Circle(world, new Vector2(WORLD_WIDTH / 2, WORLD_HEIGHT / 2), 0.5f, BodyDef.BodyType.DynamicBody, SCALE_FACTOR);
         ball.setLinearVelocity(new Vector2(4, 4));
-        box = new Box(world, new Vector2(WORLD_WIDTH / 2, 1), new Vector2(2, 2), BodyDef.BodyType.KinematicBody, SCALE_FACTOR);
+        box = new Box(world, new Vector2(WORLD_WIDTH / 2, 0.5f), new Vector2(4, 1), BodyDef.BodyType.DynamicBody, SCALE_FACTOR);
 
         left = new Box(world, new Vector2(0, WORLD_HEIGHT / 2), new Vector2(0.5f, WORLD_HEIGHT), BodyDef.BodyType.StaticBody, SCALE_FACTOR);
         right = new Box(world, new Vector2(WORLD_WIDTH, WORLD_HEIGHT / 2), new Vector2(0.5f, WORLD_HEIGHT), BodyDef.BodyType.StaticBody, SCALE_FACTOR);
@@ -74,15 +76,14 @@ public class MyPongGame extends ApplicationAdapter {
         //libgdx config changes
         Gdx.graphics.setContinuousRendering(false);
 
-        inputStream = InputObservable.create(camera);
+        inputStream = InputObservable.create(myWorldcamera);
         inputStream
                 .filter(event -> event.type == InputObservable.EventType.DOWN)
                 .buffer(1000, TimeUnit.MILLISECONDS)
                 .doOnEach(item -> Gdx.app.log("Count", "" + item.getValue().size()))
-                .filter(items -> items.size() > 2)
+                .filter(items -> items.size() > 1)
                 .take(1)
                 .ignoreElements().subscribe(this::startGame);
-
     }
 
     public void startGame() {
@@ -93,8 +94,39 @@ public class MyPongGame extends ApplicationAdapter {
                     world.step(0.02f, 6, 2);
                     Gdx.graphics.requestRendering();
                 });
-        Observable.interval(1, TimeUnit.SECONDS).subscribe((time) -> score++);
+        Observable.interval(2, TimeUnit.SECONDS).subscribe(time -> ball.scaleVelocity(1.1f));
+        Observable.interval(1, TimeUnit.SECONDS).subscribe(time -> score++);
+        inputStream
+                .groupBy(event -> event.pointer)
+                .subscribe(eventstream -> processTouchEvent(eventstream.share(), bottom.getBody(), box.getBody()));
     }
+
+    private void processTouchEvent(Observable<InputObservable.InputEvent> inputStream, Body bodyA, Body bodyB) {
+
+        inputStream
+                .filter(event -> event.type == InputObservable.EventType.DOWN)
+                .flatMapSingle(event -> {
+                    Gdx.app.log("TouchDown", event.toString());
+                    MouseJointDef def = new MouseJointDef();
+                    def.bodyA = bodyA;
+                    def.bodyB = bodyB;
+                    //def.collideConnected = true;
+                    def.target.set(event.x, bodyB.getPosition().y);
+                    def.maxForce = 10000.0f;
+
+                    return inputStream
+                            .takeWhile(event1 -> event1.type != InputObservable.EventType.UP)
+                            .reduce((MouseJoint) world.createJoint(def), (joint, ev) -> {
+                                joint.setTarget(new Vector2(ev.x, bodyB.getPosition().y));
+                                return joint;
+                            });
+                })
+                .subscribe(joint -> {
+                    Gdx.app.log("TouchEvent", "Action Complete");
+                    world.destroyJoint(joint);
+                });
+    }
+
 
     @Override
     public void render() {

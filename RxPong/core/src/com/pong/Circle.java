@@ -67,4 +67,8 @@ public class Circle {
         renderer.circle(position.x * scaleFactor, position.y * scaleFactor, radius * scaleFactor);
         renderer.end();
     }
+
+    public void scaleVelocity(float scl) {
+        body.setLinearVelocity(body.getLinearVelocity().scl(scl));
+    }
 }
