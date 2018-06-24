@@ -7,23 +7,38 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.physics.box2d.BodyDef;
+import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
+import com.badlogic.gdx.physics.box2d.World;
 
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
+import io.reactivex.Scheduler;
 
 public class MyPongGame extends ApplicationAdapter {
 
     //View Objects
-    BitmapFont font;
-    SpriteBatch batch;
-    Integer score = 0;
-    OrthographicCamera camera;
+    private BitmapFont font;
+    private SpriteBatch batch;
+    private Integer score = 0;
+    private OrthographicCamera camera;
     private OrthographicCamera myWorldcamera;
-
-    private int SCREEN_WIDTH, SCREEN_HEIGHT;
-    private int WORLD_WIDTH = 10, WORLD_HEIGHT = 10;
+    private ShapeRenderer shapeRenderer;
+    private Box2DDebugRenderer box2DRenderer;
+    private float SCREEN_WIDTH, SCREEN_HEIGHT;
+    private float WORLD_WIDTH, WORLD_HEIGHT;
+    private float SCALE_FACTOR;
     private Observable<InputObservable.InputEvent> inputStream;
+    private World world;
+    private Circle ball;
+    private Box box;
+    private Box left;
+    private Box right;
+    private Box top;
+    private Box bottom;
 
     @Override
     public void create() {
@@ -34,11 +49,30 @@ public class MyPongGame extends ApplicationAdapter {
 
         float w = Gdx.graphics.getWidth();
         float h = Gdx.graphics.getHeight();
-        myWorldcamera = Utility.setupCamera(WORLD_WIDTH, WORLD_HEIGHT * (h / w));
 
-        camera = Utility.setupCamera(w, h);
         SCREEN_WIDTH = (int) h;
         SCREEN_HEIGHT = (int) w;
+        WORLD_WIDTH = 10;
+        SCALE_FACTOR = SCREEN_WIDTH / WORLD_WIDTH;
+        WORLD_HEIGHT = SCREEN_HEIGHT / SCALE_FACTOR;
+
+        camera = Utility.setupCamera(w, h);
+        myWorldcamera = Utility.setupCamera(WORLD_HEIGHT, WORLD_WIDTH);
+
+        shapeRenderer = new ShapeRenderer();
+        box2DRenderer = new Box2DDebugRenderer();
+        world = new World(new Vector2(0, -5f), false);
+        ball = new Circle(world, new Vector2(WORLD_WIDTH / 2, WORLD_HEIGHT / 2), 0.5f, BodyDef.BodyType.DynamicBody, SCALE_FACTOR);
+        ball.setLinearVelocity(new Vector2(4, 4));
+        box = new Box(world, new Vector2(WORLD_WIDTH / 2, 1), new Vector2(2, 2), BodyDef.BodyType.KinematicBody, SCALE_FACTOR);
+
+        left = new Box(world, new Vector2(0, WORLD_HEIGHT / 2), new Vector2(0.5f, WORLD_HEIGHT), BodyDef.BodyType.StaticBody, SCALE_FACTOR);
+        right = new Box(world, new Vector2(WORLD_WIDTH, WORLD_HEIGHT / 2), new Vector2(0.5f, WORLD_HEIGHT), BodyDef.BodyType.StaticBody, SCALE_FACTOR);
+        top = new Box(world, new Vector2(WORLD_WIDTH / 2, WORLD_HEIGHT), new Vector2(WORLD_WIDTH, 0.5f), BodyDef.BodyType.StaticBody, SCALE_FACTOR);
+        bottom = new Box(world, new Vector2(WORLD_WIDTH / 2, 0), new Vector2(WORLD_WIDTH, 0.5f), BodyDef.BodyType.StaticBody, SCALE_FACTOR);
+
+        //libgdx config changes
+        Gdx.graphics.setContinuousRendering(false);
 
         inputStream = InputObservable.create(camera);
         inputStream
@@ -47,17 +81,18 @@ public class MyPongGame extends ApplicationAdapter {
                 .doOnEach(item -> Gdx.app.log("Count", "" + item.getValue().size()))
                 .filter(items -> items.size() > 2)
                 .take(1)
-                .ignoreElements()
-                .subscribe(this::startGame);
+                .ignoreElements().subscribe(this::startGame);
 
-        //libgdx config changes
-        Gdx.graphics.setContinuousRendering(false);
     }
 
     public void startGame() {
+        Gdx.app.log("Game", "Started");
         Observable
-                .interval(500, TimeUnit.MILLISECONDS)
-                .subscribe(count -> Gdx.graphics.requestRendering());
+                .interval(20, TimeUnit.MILLISECONDS)
+                .subscribe(count -> {
+                    world.step(0.02f, 6, 2);
+                    Gdx.graphics.requestRendering();
+                });
         Observable.interval(1, TimeUnit.SECONDS).subscribe((time) -> score++);
     }
 
@@ -65,10 +100,22 @@ public class MyPongGame extends ApplicationAdapter {
     public void render() {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        box2DRenderer.render(world, myWorldcamera.combined);
         batch.setProjectionMatrix(camera.combined);
+        shapeRenderer.setProjectionMatrix(camera.combined);
+
+        ball.render(shapeRenderer);
+        box.render(shapeRenderer);
+        left.render(shapeRenderer);
+        right.render(shapeRenderer);
+        top.render(shapeRenderer);
+        bottom.render(shapeRenderer);
+
         batch.begin();
         font.draw(batch, score.toString(), SCREEN_WIDTH / 2 - 50, 100);
         batch.end();
+
     }
 
     @Override
