@@ -34,10 +34,9 @@ public class Circle {
         FixtureDef defination = new FixtureDef();
         defination.shape = shape;
         defination.density = 0.1f;
-        defination.friction = 0.0f;
+        defination.friction = 0;
         defination.restitution = 1f;
         body.createFixture(defination);
-        //body.setGravityScale(0);
         shape.dispose();
 
         fixture = body.getFixtureList().get(0);
@@ -63,8 +62,8 @@ public class Circle {
 
     void render(ShapeRenderer renderer) {
         Vector2 position = getPosition();
-        renderer.begin(ShapeRenderer.ShapeType.Line);
-        renderer.circle(position.x * scaleFactor, position.y * scaleFactor, radius * scaleFactor);
+        renderer.begin(ShapeRenderer.ShapeType.Filled);
+        renderer.circle(position.x * scaleFactor, position.y * scaleFactor, (radius - 0.2f) * scaleFactor);
         renderer.end();
     }
 

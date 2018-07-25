@@ -36,7 +36,7 @@ public class Box {
         FixtureDef fixtureDef = new FixtureDef();
         fixtureDef.shape = shape;
         fixtureDef.density = 10f;
-        fixtureDef.friction = 0.0f;
+        fixtureDef.friction = 0.3f;
         fixtureDef.restitution = 0f;
         body.createFixture(fixtureDef);
         shape.dispose();

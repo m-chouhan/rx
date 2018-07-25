@@ -1,5 +1,5 @@
 buildscript {
-    
+
 
     repositories {
         mavenLocal()
@@ -10,7 +10,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:3.1.0'
-        
+
 
     }
 }
@@ -56,7 +56,7 @@ project(":android") {
         natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-arm64-v8a"
         natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-x86"
         natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-x86_64"
-        
+
     }
 }
 
@@ -69,6 +69,7 @@ project(":core") {
         compile "com.badlogicgames.gdx:gdx-box2d:$gdxVersion"
         implementation 'io.reactivex.rxjava2:rxandroid:2.0.2'
         implementation 'io.reactivex.rxjava2:rxjava:2.1.12'
+        implementation 'org.apache.commons:commons-lang3:3.6'
     }
 }
 
