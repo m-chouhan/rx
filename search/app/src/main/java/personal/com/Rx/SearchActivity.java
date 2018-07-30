@@ -1,4 +1,4 @@
-package personal.com.actrecog;
+package personal.com.Rx;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -6,6 +6,7 @@ import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.jakewharton.rxbinding2.view.RxView;
 import com.jakewharton.rxbinding2.widget.RxTextView;
@@ -26,7 +27,6 @@ public class SearchActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
         mEditText = findViewById(R.id.message);
         Button sendRequest = findViewById(R.id.sendRequest);
         Button cancelRequest = findViewById(R.id.cancelRequest);
@@ -44,12 +44,12 @@ public class SearchActivity extends AppCompatActivity {
         Observable<Integer> cancelRequest$ = RxView
                 .clicks(cancelRequest)
                 .scan(0, (counter, string) -> ++counter)
-                .skip(1);
+                .skip(1).replay(1);
 
         Observable<String> search$ = searchButton$
                 .mergeWith(editText$)
                 .distinctUntilChanged()
-                .debounce(1, TimeUnit.SECONDS)
+                .debounce(2, TimeUnit.SECONDS)
                 .doOnNext(text -> {
                     Log.i(TAG, "Searching [" + text + "]");
                 });
@@ -58,6 +58,9 @@ public class SearchActivity extends AppCompatActivity {
                 .switchMap(
                         text -> fetchList(text)
                                 .takeUntil(cancelRequest$)
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .doOnComplete(() -> toast("Completed [" + text + "]"))
+                                .doOnDispose(() -> toast("Dispose [" + text + "]"))
                                 .subscribeOn(AndroidSchedulers.mainThread())
                 )
                 .observeOn(AndroidSchedulers.mainThread())
@@ -84,5 +87,10 @@ public class SearchActivity extends AppCompatActivity {
                 .toObservable()
                 .delay(2, TimeUnit.SECONDS);
         //.blockingGet();
+    }
+
+    public void toast(String message) {
+        Log.i(TAG, message);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }
