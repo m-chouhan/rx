@@ -7,20 +7,28 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.support.annotation.Nullable;
+import android.support.v4.util.Pair;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
 
 import com.jakewharton.rxbinding2.view.RxView;
 
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
 import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.observables.ConnectableObservable;
+import io.reactivex.subjects.PublishSubject;
+import personal.com.Rx.TouchInput;
+
+import static personal.com.Rx.TouchInput.EventType.DOWN;
+import static personal.com.Rx.TouchInput.EventType.MOVE;
+import static personal.com.Rx.TouchInput.EventType.UP;
 
 
 /**
@@ -31,8 +39,7 @@ public class DrawableView extends View {
 
     public static final String TAG = "DrawableView";
 
-    private Paint paint;
-    private ArrayList<Rect> objList = new ArrayList<>();
+    private ArrayList<Pair<Rect, Paint>> objList = new ArrayList<>();
 
     public DrawableView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
@@ -43,110 +50,98 @@ public class DrawableView extends View {
         super(context);
     }
 
-    private void init() {
-        paint = new Paint();
-        paint.setColor(Color.RED);
+    private PublishSubject<TouchInput> transform(Observable<MotionEvent> input$) {
 
-        objList.add(new Rect(0, 0, 100, 100));
-        objList.add(new Rect(100, 100, 200, 200));
-
-        ConnectableObservable<MotionEvent> input$ = RxView.touches(this).publish();
-        input$.subscribe(
-                m -> {
-                    int pointerCount = m.getPointerCount();
-
-                    for (int i = 0; i < pointerCount; i++) {
-                        int x = (int) m.getX(i);
-                        int y = (int) m.getY(i);
-                        int id = m.getPointerId(i);
-                        int action = m.getActionMasked();
-                        int actionIndex = m.getActionIndex();
-                        String actionString;
-
-                        switch (action) {
-                            case MotionEvent.ACTION_DOWN:
-                                actionString = "DOWN";
-                                break;
-                            case MotionEvent.ACTION_UP:
-                                actionString = "UP";
-                                break;
-                            case MotionEvent.ACTION_POINTER_DOWN:
-                                actionString = "PNTR DOWN";
-                                break;
-                            case MotionEvent.ACTION_POINTER_UP:
-                                actionString = "PNTR UP";
-                                break;
-                            case MotionEvent.ACTION_MOVE:
-                                actionString = "MOVE";
-                                break;
-                            default:
-                                actionString = "";
+        PublishSubject<TouchInput> transformed$ = PublishSubject.create();
+        input$
+                .subscribe((current) -> {
+                    int count = current.getPointerCount();
+                    switch (current.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN:
+                        case MotionEvent.ACTION_POINTER_DOWN: {
+                            int index = current.getActionIndex();
+                            int id = current.getPointerId(index);
+                            transformed$.onNext(new TouchInput(current.getX(index),
+                                    current.getY(index), id, DOWN));
+                            break;
                         }
-
-                        String touchStatus = "Action: " + actionString + " Action Index: " + actionIndex + " ID: " + id + " X: " + x + " Y: " + y;
-                        Log.i(TAG, touchStatus);
+                        case MotionEvent.ACTION_UP:
+                        case MotionEvent.ACTION_POINTER_UP: {
+                            int index = current.getActionIndex();
+                            int id = current.getPointerId(index);
+                            transformed$
+                                    .onNext(new TouchInput(current.getX(index), current.getY(index), id, UP));
+                            break;
+                        }
+                        case MotionEvent.ACTION_MOVE:
+                            for (int actionId = 0; actionId < count; ++actionId) {
+                                float x = current.getX(actionId);
+                                float y = current.getY(actionId);
+                                int id = current.getPointerId(actionId);
+                                transformed$.onNext(new TouchInput(x, y, id, MOVE));
+                            }
+                            break;
                     }
-                }
-        );
-
-        Observable<MotionEvent> downEvent$ =
-                input$
-                        .filter(motionEvent ->
-                                motionEvent.getAction() == MotionEvent.ACTION_DOWN ||
-                                        motionEvent.getAction() == MotionEvent.ACTION_POINTER_DOWN);
-        Observable<MotionEvent> upEvent$ =
-                input$
-                        .filter(motionEvent -> motionEvent.getAction() == MotionEvent.ACTION_UP ||
-                                motionEvent.getAction() == MotionEvent.ACTION_POINTER_UP);
-        /*
-        input$
-                .window(downEvent$, (item) -> upEvent$)
-                .subscribe(
-                        motionEvent$ -> processGesture(motionEvent$)
-                );
-        /**/
-        /*
-        input$
-                .groupBy(motionEvent -> motionEvent.getPointerId(motionEvent.getActionIndex()))
-                .map(stream$ -> stream$.publish())
-                .subscribe(splitInput$ -> {
-                    Observable<MotionEvent> down$ =
-                            splitInput$
-                                    .filter(motionEvent ->
-                                            motionEvent.getActionMasked() == MotionEvent.ACTION_DOWN ||
-                                                    motionEvent.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN);
-                    Observable<MotionEvent> up$ =
-                            splitInput$
-                                    .filter(motionEvent -> motionEvent.getActionMasked() == MotionEvent.ACTION_UP ||
-                                            motionEvent.getActionMasked() == MotionEvent.ACTION_POINTER_UP);
-                    splitInput$
-                            .window(down$, (item) -> up$)
-                            .subscribe(motionEvent$ -> processGesture(motionEvent$));
-                    splitInput$.connect();
                 });
-        /**/
-        input$.connect();
+
+        return transformed$;
     }
 
-    private void processGesture(Observable<MotionEvent> motionEvent$) {
+    private void init() {
+        /* Object initialization */
+        for (int i = 0; i < 700; i += 150) {
+            objList.add(
+                    Pair.create(new Rect(i, i, i + 150, i + 150),
+                            new Paint(Color.RED))
+            );
+        }
 
-        AtomicReference<Rect> rect = new AtomicReference<>();
+        PublishSubject<TouchInput> transformed$ = transform(RxView.touches(this));
 
-        motionEvent$
-//                .skipWhile(motionEvent -> {
-//                    if (motionEvent.getAction() != MotionEvent.ACTION_DOWN) return true;
-//                    for (Rect r : objList) {
-//                        if (r.contains((int) motionEvent.getX(), (int) motionEvent.getY())) {
-//                            rect.set(r);
-//                            return false;
-//                        }
-//                    }
-//                    return true;
-//                })
-                .subscribe(new Observer<MotionEvent>() {
+        Observable<Observable<TouchInput>> pointers$ =
+                transformed$
+                        .groupBy(event -> event.pointer)
+                        //.take(3)  //limits max supported fingers
+                        .map(Observable::share)
+                        .share();
+        pointers$
+                .subscribe(pointer$ ->
+                        pointer$.filter(event -> event.type == DOWN)
+                                .buffer(800, TimeUnit.MILLISECONDS)
+                                .filter(items -> items.size() > 1)
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe((item) -> toast("DOUBLE TAP PERFORMED")));
 
+        Observable<Observable<TouchInput>> touchEvent$ =
+                pointers$
+                        .flatMap(split$ -> {
+                                    Observable<TouchInput> down$ = split$.filter(event -> event.type == DOWN);
+                                    Observable<TouchInput> up$ = split$.filter(event -> event.type == UP);
+                                    return split$
+                                            .distinctUntilChanged()
+                                            //.doOnNext(touchInput -> Log.i(TAG, touchInput.toString()))
+                                            .window(down$, (item) -> up$)
+                                            .map(Observable::share);
+                                }
+                        ).share();
+
+        touchEvent$.subscribe(this::processGesture);
+    }
+
+    private void processGesture(Observable<TouchInput> touchInput$) {
+
+        touchInput$
+                .buffer(2, 1)
+                .filter(buffer -> buffer.size() > 1 && buffer.get(1).x - buffer.get(0).x > 0)
+                .subscribe(
+                        item -> Log.i(TAG, "UP")
+                );
+
+        touchInput$
+                .subscribe(new Observer<TouchInput>() {
                     Point initial = new Point();
                     Rect rectangle;
+                    Paint paint;
 
                     @Override
                     public void onSubscribe(Disposable d) {
@@ -154,29 +149,26 @@ public class DrawableView extends View {
                     }
 
                     @Override
-                    public void onNext(MotionEvent motionEvent) {
+                    public void onNext(TouchInput event) {
 
-                        Log.i(TAG, "onNext" + motionEvent.toString());
-                        int x = (int) motionEvent.getX();
-                        int y = (int) motionEvent.getY();
-                        switch (motionEvent.getActionMasked()) {
-                            case MotionEvent.ACTION_DOWN:
-                            case MotionEvent.ACTION_POINTER_DOWN:
-                                for (Rect r : objList) {
-                                    if (r.contains(x, y)) {
+                        //Log.i(TAG, "onNext" + event.toString());
+                        int x = (int) event.x;
+                        int y = (int) event.y;
+
+                        switch (event.type) {
+                            case DOWN:
+                                for (Pair<Rect, Paint> r : objList) {
+                                    if (r.first.contains(x, y)) {
                                         Log.i(TAG, "Selected " + r.toString());
-                                        rectangle = r;
-                                        initial.set(x, y);
+                                        rectangle = r.first;
+                                        paint = r.second;
+                                        paint.setColor(Color.BLUE);
+                                        initial.set(rectangle.left, rectangle.top);
                                     }
                                 }
                                 break;
-                            case MotionEvent.ACTION_MOVE:
+                            case MOVE:
                                 if (rectangle != null) rectangle.offsetTo(x, y);
-                                break;
-
-                            case MotionEvent.ACTION_UP:
-                            case MotionEvent.ACTION_POINTER_UP:
-                                if (rectangle != null) rectangle.offsetTo(initial.x, initial.y);
                                 break;
                         }
                         postInvalidate();
@@ -185,18 +177,35 @@ public class DrawableView extends View {
                     @Override
                     public void onError(Throwable e) {
                         Log.i(TAG, "onError");
+                        e.printStackTrace();
                     }
 
                     @Override
                     public void onComplete() {
+                        if (rectangle != null) {
+                            rectangle.offsetTo(initial.x, initial.y);
+                            paint.setColor(Color.GRAY);
+                        }
                         Log.i(TAG, "onComplete");
+                        Observable.just(1)
+                                .delay(3, TimeUnit.SECONDS)
+                                .ignoreElements()
+                                .subscribe(() -> {
+                                    paint.setColor(Color.BLACK);
+                                    postInvalidate();
+                                });
                     }
                 });
     }
 
+    public void toast(String message) {
+        Log.i(TAG, message);
+        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
-        for (Rect rect : objList)
-            canvas.drawRect(rect, paint);
+        for (Pair<Rect, Paint> pair : objList)
+            canvas.drawRect(pair.first, pair.second);
     }
 }
