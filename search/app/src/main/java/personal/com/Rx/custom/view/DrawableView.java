@@ -20,11 +20,11 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
-import io.reactivex.ObservableTransformer;
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.subjects.PublishSubject;
+import personal.com.Rx.RxUtils;
 import personal.com.Rx.TouchInput;
 
 import static personal.com.Rx.TouchInput.EventType.DOWN;
@@ -129,18 +129,13 @@ public class DrawableView extends View {
         touchEvent$.subscribe(this::processGestures);
     }
 
-    ObservableTransformer<Float, Float> avg = floatObservable -> floatObservable
-            .scan(Pair.create(0f, 1),
-                    (pair, value) -> Pair.create(pair.first + value, pair.second + 1))
-            .map(pair -> pair.first / pair.second);
-
     private void processGestures(Observable<TouchInput> touchInput$) {
 
         touchInput$
                 .buffer(2, 1)
                 .filter(buffer -> buffer.size() > 1)
                 .map(buffer -> buffer.get(1).y - buffer.get(0).y)
-                .compose(avg)
+                .compose(RxUtils.avg)
                 .debounce(1200, TimeUnit.MILLISECONDS)
                 .take(1)
                 .filter(avgFloat -> Math.abs(avgFloat) > 25)
@@ -149,7 +144,7 @@ public class DrawableView extends View {
                         avgFloat -> {
                             if (avgFloat > 0) toast("Down Swipe Performed");
                             else toast("Up Swipe Performed");
-                            Log.i(TAG, "Value" + avg);
+                            Log.i(TAG, "Value" + avgFloat);
                         }
                 );
 
