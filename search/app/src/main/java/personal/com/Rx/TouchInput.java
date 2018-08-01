@@ -6,9 +6,9 @@ package personal.com.Rx;
 
 public class TouchInput {
 
-    public enum EventType {UP, DOWN, MOVE}
+    public enum EventType {UP, DOWN, MOVE, SWIPE_UP, SWIPE_DOWN, DOUBLE_TAP}
 
-    public final EventType type;
+    public EventType type;
 
     public float x, y;
     public final int pointer;

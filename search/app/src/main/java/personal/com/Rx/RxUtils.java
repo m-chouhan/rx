@@ -2,6 +2,8 @@ package personal.com.Rx;
 
 import android.support.v4.util.Pair;
 
+import java.util.List;
+
 import io.reactivex.ObservableTransformer;
 
 /**
@@ -15,4 +17,14 @@ public class RxUtils {
                     (pair, value) -> Pair.create(pair.first + value, pair.second + 1))
             .map(pair -> pair.first / pair.second);
 
+    /**
+     * Generics
+     */
+    public static ObservableTransformer<Object, List<Object>> makePair = observable -> observable.buffer(2, 1)
+            .filter(buffer -> buffer.size() == 2);
+
+    public static <T> ObservableTransformer<T, List<T>> pair() {
+        return observable -> observable.buffer(2, 1)
+                .filter(buffer -> buffer.size() == 2);
+    }
 }

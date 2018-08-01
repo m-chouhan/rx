@@ -21,14 +21,17 @@ import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
 import io.reactivex.Observer;
-import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.subjects.PublishSubject;
 import personal.com.Rx.RxUtils;
 import personal.com.Rx.TouchInput;
 
+import static personal.com.Rx.RxUtils.pair;
+import static personal.com.Rx.TouchInput.EventType.DOUBLE_TAP;
 import static personal.com.Rx.TouchInput.EventType.DOWN;
 import static personal.com.Rx.TouchInput.EventType.MOVE;
+import static personal.com.Rx.TouchInput.EventType.SWIPE_DOWN;
+import static personal.com.Rx.TouchInput.EventType.SWIPE_UP;
 import static personal.com.Rx.TouchInput.EventType.UP;
 
 
@@ -41,6 +44,7 @@ public class DrawableView extends View {
     public static final String TAG = "DrawableView";
 
     private ArrayList<Pair<Rect, Paint>> objList = new ArrayList<>();
+    private PublishSubject<TouchInput> gestures$;
 
     public DrawableView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
@@ -97,6 +101,8 @@ public class DrawableView extends View {
             );
         }
 
+        gestures$ = PublishSubject.create();
+
         PublishSubject<TouchInput> transformed$ = transform(RxView.touches(this));
 
         Observable<Observable<TouchInput>> pointers$ =
@@ -105,14 +111,32 @@ public class DrawableView extends View {
                         //.take(3)  //limits max supported fingers
                         .map(Observable::share)
                         .share();
+
         pointers$
-                .subscribe(pointer$ ->
+                .flatMap(pointer$ ->
                         pointer$.filter(event -> event.type == DOWN)
                                 .buffer(800, TimeUnit.MILLISECONDS)
-                                .filter(items -> items.size() > 1)
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe((item) -> toast("DOUBLE TAP PERFORMED")));
-
+                                .filter(items -> items.size() == 2))
+                .subscribe(list -> {
+                    TouchInput touchInput = list.get(1);
+                    touchInput.type = DOUBLE_TAP;
+                    gestures$.onNext(touchInput);
+                });
+        /*/
+        pointers$
+                .subscribe(pointer$ -> {
+                            pointer$.filter(event -> event.type == DOWN)
+                                    .buffer(800, TimeUnit.MILLISECONDS)
+                                    .filter(items -> items.size() > 1)
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe((item) -> {
+                                        TouchInput touchInput = item.get(1);
+                                        touchInput.type = DOUBLE_TAP;
+                                        gestures$.onNext(touchInput);
+                                    });
+                        }
+                );
+        */
         Observable<Observable<TouchInput>> touchEvent$ =
                 pointers$
                         .flatMap(split$ -> {
@@ -126,14 +150,34 @@ public class DrawableView extends View {
                                 }
                         ).share();
 
+        touchEvent$
+                .flatMap(touchInput$ ->
+                        touchInput$
+                                .compose(pair())
+                                .map(buffer -> buffer.get(1).y - buffer.get(0).y)
+                                .compose(RxUtils.avg)
+                                .debounce(1200, TimeUnit.MILLISECONDS)
+                                .take(1)
+                                .filter(avgFloat -> Math.abs(avgFloat) > 25)
+                )
+                .subscribe(
+                        avgFloat -> {
+                            if (avgFloat > 0)
+                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_DOWN));
+                            else
+                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_UP));
+                            Log.i(TAG, "Value" + avgFloat);
+                        }
+                );
+
         touchEvent$.subscribe(this::processGestures);
     }
 
     private void processGestures(Observable<TouchInput> touchInput$) {
 
+        /*
         touchInput$
-                .buffer(2, 1)
-                .filter(buffer -> buffer.size() > 1)
+                .compose(pair())
                 .map(buffer -> buffer.get(1).y - buffer.get(0).y)
                 .compose(RxUtils.avg)
                 .debounce(1200, TimeUnit.MILLISECONDS)
@@ -142,12 +186,15 @@ public class DrawableView extends View {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         avgFloat -> {
-                            if (avgFloat > 0) toast("Down Swipe Performed");
-                            else toast("Up Swipe Performed");
+                            if (avgFloat > 0)
+                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_DOWN));
+                            else
+                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_UP));
+
                             Log.i(TAG, "Value" + avgFloat);
                         }
                 );
-
+        */
         touchInput$
                 .subscribe(new Observer<TouchInput>() {
                     Point initial = new Point();
