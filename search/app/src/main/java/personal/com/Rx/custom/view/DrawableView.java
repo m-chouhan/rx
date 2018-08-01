@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
+import io.reactivex.ObservableTransformer;
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
@@ -125,16 +126,31 @@ public class DrawableView extends View {
                                 }
                         ).share();
 
-        touchEvent$.subscribe(this::processGesture);
+        touchEvent$.subscribe(this::processGestures);
     }
 
-    private void processGesture(Observable<TouchInput> touchInput$) {
+    ObservableTransformer<Float, Float> avg = floatObservable -> floatObservable
+            .scan(Pair.create(0f, 1),
+                    (pair, value) -> Pair.create(pair.first + value, pair.second + 1))
+            .map(pair -> pair.first / pair.second);
+
+    private void processGestures(Observable<TouchInput> touchInput$) {
 
         touchInput$
                 .buffer(2, 1)
-                .filter(buffer -> buffer.size() > 1 && buffer.get(1).x - buffer.get(0).x > 0)
+                .filter(buffer -> buffer.size() > 1)
+                .map(buffer -> buffer.get(1).y - buffer.get(0).y)
+                .compose(avg)
+                .debounce(1200, TimeUnit.MILLISECONDS)
+                .take(1)
+                .filter(avgFloat -> Math.abs(avgFloat) > 25)
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                        item -> Log.i(TAG, "UP")
+                        avgFloat -> {
+                            if (avgFloat > 0) toast("Down Swipe Performed");
+                            else toast("Up Swipe Performed");
+                            Log.i(TAG, "Value" + avg);
+                        }
                 );
 
         touchInput$
@@ -187,13 +203,13 @@ public class DrawableView extends View {
                             paint.setColor(Color.GRAY);
                         }
                         Log.i(TAG, "onComplete");
-                        Observable.just(1)
-                                .delay(3, TimeUnit.SECONDS)
-                                .ignoreElements()
-                                .subscribe(() -> {
-                                    paint.setColor(Color.BLACK);
-                                    postInvalidate();
-                                });
+                        if (paint != null)
+                            Observable.just(paint)
+                                    .delay(2, TimeUnit.SECONDS)
+                                    .subscribe((paint) -> {
+                                        paint.setColor(Color.BLACK);
+                                        postInvalidate();
+                                    });
                     }
                 });
     }
