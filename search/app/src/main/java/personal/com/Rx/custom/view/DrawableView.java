@@ -19,14 +19,14 @@ import com.jakewharton.rxbinding2.view.RxView;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Maybe;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.subjects.PublishSubject;
-import personal.com.Rx.RxUtils;
 import personal.com.Rx.TouchInput;
 
-import static personal.com.Rx.RxUtils.pair;
 import static personal.com.Rx.TouchInput.EventType.DOUBLE_TAP;
 import static personal.com.Rx.TouchInput.EventType.DOWN;
 import static personal.com.Rx.TouchInput.EventType.MOVE;
@@ -66,16 +66,18 @@ public class DrawableView extends View {
                         case MotionEvent.ACTION_POINTER_DOWN: {
                             int index = current.getActionIndex();
                             int id = current.getPointerId(index);
+                            long time = current.getEventTime();
                             transformed$.onNext(new TouchInput(current.getX(index),
-                                    current.getY(index), id, DOWN));
+                                    current.getY(index), id, DOWN, time));
                             break;
                         }
                         case MotionEvent.ACTION_UP:
                         case MotionEvent.ACTION_POINTER_UP: {
                             int index = current.getActionIndex();
                             int id = current.getPointerId(index);
+                            long time = current.getEventTime();
                             transformed$
-                                    .onNext(new TouchInput(current.getX(index), current.getY(index), id, UP));
+                                    .onNext(new TouchInput(current.getX(index), current.getY(index), id, UP, time));
                             break;
                         }
                         case MotionEvent.ACTION_MOVE:
@@ -83,7 +85,8 @@ public class DrawableView extends View {
                                 float x = current.getX(actionId);
                                 float y = current.getY(actionId);
                                 int id = current.getPointerId(actionId);
-                                transformed$.onNext(new TouchInput(x, y, id, MOVE));
+                                long time = current.getEventTime();
+                                transformed$.onNext(new TouchInput(x, y, id, MOVE, time));
                             }
                             break;
                     }
@@ -122,79 +125,61 @@ public class DrawableView extends View {
                     touchInput.type = DOUBLE_TAP;
                     gestures$.onNext(touchInput);
                 });
-        /*/
-        pointers$
-                .subscribe(pointer$ -> {
-                            pointer$.filter(event -> event.type == DOWN)
-                                    .buffer(800, TimeUnit.MILLISECONDS)
-                                    .filter(items -> items.size() > 1)
-                                    .observeOn(AndroidSchedulers.mainThread())
-                                    .subscribe((item) -> {
-                                        TouchInput touchInput = item.get(1);
-                                        touchInput.type = DOUBLE_TAP;
-                                        gestures$.onNext(touchInput);
-                                    });
-                        }
-                );
-        */
+
         Observable<Observable<TouchInput>> touchEvent$ =
                 pointers$
-                        .flatMap(split$ -> {
-                                    Observable<TouchInput> down$ = split$.filter(event -> event.type == DOWN);
-                                    Observable<TouchInput> up$ = split$.filter(event -> event.type == UP);
-                                    return split$
+                        .flatMap(pointer$ -> {
+                                    Observable<TouchInput> down$ = pointer$.filter(event -> event.type == DOWN);
+                                    Observable<TouchInput> up$ = pointer$.filter(event -> event.type == UP);
+                                    return pointer$
                                             .distinctUntilChanged()
-                                            //.doOnNext(touchInput -> Log.i(TAG, touchInput.toString()))
                                             .window(down$, (item) -> up$)
                                             .map(Observable::share);
                                 }
                         ).share();
 
         touchEvent$
-                .flatMap(touchInput$ ->
-                        touchInput$
-                                .compose(pair())
-                                .map(buffer -> buffer.get(1).y - buffer.get(0).y)
-                                .compose(RxUtils.avg)
-                                .debounce(1200, TimeUnit.MILLISECONDS)
-                                .take(1)
-                                .filter(avgFloat -> Math.abs(avgFloat) > 25)
+                .flatMapMaybe(touchInput$ ->
+                        Maybe.zip(
+                                touchInput$.lastElement(),
+                                touchInput$.firstElement(),
+                                (last, first) -> {
+                                    float ydiff = last.y - first.y;
+                                    float delta = last.time - first.time;
+                                    float velocity = ydiff / delta;
+                                    Log.i(TAG, "ydiff = " + ydiff + ", delta = " + delta + ", velocity = " + velocity);
+                                    if (delta > 1000) return 0f;
+                                    return velocity;
+                                })
                 )
-                .subscribe(
-                        avgFloat -> {
-                            if (avgFloat > 0)
-                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_DOWN));
-                            else
-                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_UP));
-                            Log.i(TAG, "Value" + avgFloat);
-                        }
-                );
+                .subscribe(velocity -> {
+                    if (velocity > 1.5f)
+                        gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_DOWN, 0));
+                    else if (velocity < -1.5f)
+                        gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_UP, 0));
+                });
 
         touchEvent$.subscribe(this::processGestures);
+        gestures$
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        event -> {
+                            switch (event.type) {
+                                case SWIPE_UP:
+                                    toast("SWIPE_UP : JUMP UP");
+                                    break;
+                                case SWIPE_DOWN:
+                                    toast("SWIPE_DOWN : JUMP DOWN");
+                                    break;
+                                case DOUBLE_TAP:
+                                    toast("DOUBLE_TAP : SHOOT");
+                            }
+                        }
+                );
     }
 
     private void processGestures(Observable<TouchInput> touchInput$) {
 
-        /*
-        touchInput$
-                .compose(pair())
-                .map(buffer -> buffer.get(1).y - buffer.get(0).y)
-                .compose(RxUtils.avg)
-                .debounce(1200, TimeUnit.MILLISECONDS)
-                .take(1)
-                .filter(avgFloat -> Math.abs(avgFloat) > 25)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        avgFloat -> {
-                            if (avgFloat > 0)
-                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_DOWN));
-                            else
-                                gestures$.onNext(new TouchInput(0, 0, 0, SWIPE_UP));
-
-                            Log.i(TAG, "Value" + avgFloat);
-                        }
-                );
-        */
         touchInput$
                 .subscribe(new Observer<TouchInput>() {
                     Point initial = new Point();
@@ -203,7 +188,7 @@ public class DrawableView extends View {
 
                     @Override
                     public void onSubscribe(Disposable d) {
-                        Log.i(TAG, "onSubscribe");
+                        Log.i(TAG, "onStart[Move]");
                     }
 
                     @Override
@@ -234,7 +219,7 @@ public class DrawableView extends View {
 
                     @Override
                     public void onError(Throwable e) {
-                        Log.i(TAG, "onError");
+                        Log.i(TAG, "onError[Move]");
                         e.printStackTrace();
                     }
 
@@ -244,7 +229,7 @@ public class DrawableView extends View {
                             rectangle.offsetTo(initial.x, initial.y);
                             paint.setColor(Color.GRAY);
                         }
-                        Log.i(TAG, "onComplete");
+                        Log.i(TAG, "onComplete[Move]");
                         if (paint != null)
                             Observable.just(paint)
                                     .delay(2, TimeUnit.SECONDS)

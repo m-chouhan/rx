@@ -12,12 +12,14 @@ public class TouchInput {
 
     public float x, y;
     public final int pointer;
+    public final long time;
 
-    public TouchInput(float x, float y, int pointer, EventType type) {
+    public TouchInput(float x, float y, int pointer, EventType type, long time) {
         this.x = x;
         this.y = y;
         this.type = type;
         this.pointer = pointer;
+        this.time = time;
     }
 
     //required for distinct until changed to work
