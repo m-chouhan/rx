@@ -27,6 +27,7 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.subjects.PublishSubject;
 import personal.com.Rx.TouchInput;
 
+import static android.view.MotionEvent.ACTION_DOWN;
 import static personal.com.Rx.TouchInput.EventType.DOUBLE_TAP;
 import static personal.com.Rx.TouchInput.EventType.DOWN;
 import static personal.com.Rx.TouchInput.EventType.MOVE;
@@ -62,7 +63,7 @@ public class DrawableView extends View {
                 .subscribe((current) -> {
                     int count = current.getPointerCount();
                     switch (current.getActionMasked()) {
-                        case MotionEvent.ACTION_DOWN:
+                        case ACTION_DOWN:
                         case MotionEvent.ACTION_POINTER_DOWN: {
                             int index = current.getActionIndex();
                             int id = current.getPointerId(index);
@@ -97,9 +98,9 @@ public class DrawableView extends View {
 
     private void init() {
         /* Object initialization */
-        for (int i = 0; i < 700; i += 150) {
+        for (int i = 100; i <= 500; i += 100) {
             objList.add(
-                    Pair.create(new Rect(i, i, i + 150, i + 150),
+                    Pair.create(new Rect(i, i, i + 100, i + 100),
                             new Paint(Color.RED))
             );
         }
