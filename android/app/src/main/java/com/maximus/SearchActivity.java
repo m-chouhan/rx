@@ -1,4 +1,4 @@
-package personal.com.Rx;
+package com.maximus;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import personal.com.Rx.R;
 
 public class SearchActivity extends AppCompatActivity {
 

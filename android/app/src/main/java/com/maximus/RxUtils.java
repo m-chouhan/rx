@@ -1,4 +1,4 @@
-package personal.com.Rx;
+package com.maximus;
 
 import android.support.v4.util.Pair;
 

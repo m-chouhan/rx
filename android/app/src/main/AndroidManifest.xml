@@ -12,9 +12,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name="personal.com.Rx.SearchActivity"
+            android:name="com.maximus.SearchActivity"
             android:label="@string/app_name"></activity>
-        <activity android:name="personal.com.Rx.MultiTouch">
+        <activity android:name="com.maximus.MultiTouch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

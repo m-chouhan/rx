@@ -1,4 +1,4 @@
-package personal.com.Rx;
+package com.maximus;
 
 /**
  * Created by mahendra.chouhan on 7/30/18.

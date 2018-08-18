@@ -1,8 +1,10 @@
-package personal.com.Rx;
+package com.maximus;
 
 import android.os.Bundle;
 import android.support.constraint.ConstraintLayout;
 import android.support.v7.app.AppCompatActivity;
+
+import personal.com.Rx.R;
 
 public class MultiTouch extends AppCompatActivity {
 
