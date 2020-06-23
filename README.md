@@ -1,4 +1,4 @@
-# rx
+# Reactive Programming using RxJava
 ## Sample Projects for getting started with RxJava
 
 ### RxPong 

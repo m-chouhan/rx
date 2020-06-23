@@ -1,0 +1,16 @@
+{
+  "name": "js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "streamlined.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "arithmetic": "^1.0.1",
+    "rxjs": "^6.5.1",
+    "rxjs-compat": "^6.5.1"
+  }
+}
